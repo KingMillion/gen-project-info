@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>项目信息生成器</title>
+    <script src="./js/pinyin.js"></script>
+    <style>
+        :root {
+            --primary-color: #4CAF50;
+            --primary-dark: #45a049;
+            --primary-soft: rgba(76, 175, 80, 0.12);
+            --secondary-color: #2196F3;
+            --secondary-dark: #0b7dda;
+            --light-gray: #f5f5f5;
+            --medium-gray: #e0e0e0;
+            --dark-gray: #333;
+            --muted: #93a09a;
+            --mono: 'Cascadia Code', Consolas, 'JetBrains Mono', monospace;
+            --shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+            --radius: 8px;
+            --transition: all 0.25s ease;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            width: 100%;
+            min-height: 100vh;
+            margin: 0;
+            padding: 16px 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--dark-gray);
+            background: linear-gradient(135deg, #f2f6f3 0%, #eef2f9 100%);
+        }
+        
+        .app-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            padding: 22px 24px 16px;
+            width: min(1197px, 100% - 32px);
+            height: min(741px, 100vh - 32px);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .app-header {
+            text-align: center;
+            margin-bottom: 14px;
+        }
+        
+        h1 {
+            color: var(--primary-color);
+            text-align: center;
+            font-weight: 600;
+            font-size: 22px;
+            letter-spacing: 1px;
+        }
+        
+        .app-subtitle {
+            margin-top: 4px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+        
+        /* 左右两栏：左侧录入、右侧结果 */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 400px minmax(0, 1fr);
+            gap: 22px;
+            flex: 1;
+            min-height: 0;
+        }
+        
+        .left-col {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        
+        /* 模式切换 */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            padding: 4px;
+            background: var(--light-gray);
+            border-radius: 10px;
+            margin-bottom: 16px;
+            flex-shrink: 0;
+        }
+        
+        .tab {
+            flex: 1;
+            border: none;
+            background: transparent;
+            padding: 8px 10px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #666;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .tab:hover {
+            color: var(--primary-color);
+        }
+        
+        .tab.active {
+            background: white;
+            color: var(--primary-color);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .panel {
+            display: none;
+        }
+        
+        .panel.active {
+            display: block;
+            animation: rise 0.28s ease;
+        }
+        
+        @keyframes rise {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: none;
+            }
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #555;
+            font-size: 14px;
+        }
+        
+        input[type="text"], input[type="date"], textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--medium-gray);
+            border-radius: var(--radius);
+            font-size: 14px;
+            font-family: inherit;
+            color: var(--dark-gray);
+            background-color: #fdfdfd;
+            transition: var(--transition);
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 76px;
+            line-height: 1.6;
+        }
+        
+        input[type="text"]:hover, input[type="date"]:hover, textarea:hover {
+            border-color: #c3ccc6;
+        }
+        
+        input[type="text"]:focus, input[type="date"]:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            background-color: white;
+            box-shadow: 0 0 0 3px var(--primary-soft);
+        }
+        
+        input::placeholder, textarea::placeholder {
+            color: #b6bdb8;
+        }
+        
+        /* 日期选择器：整框可点击唤起面板 */
+        .date-field {
+            position: relative;
+        }
+        
+        .date-field input[type="date"] {
+            cursor: pointer;
+            padding-right: 34px;
+        }
+        
+        /* 把原生的日历指示器拉伸铺满整个输入框，点击任意位置即可弹出 */
+        .date-field input[type="date"]::-webkit-calendar-picker-indicator {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+        
+        .date-field .date-icon {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            color: #888;
+            pointer-events: none;
+        }
+        
+        .radio-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .radio-option {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            padding: 6px 10px;
+            border: 1px solid var(--medium-gray);
+            border-radius: var(--radius);
+            font-size: 13px;
+            background: #fdfdfd;
+            transition: var(--transition);
+        }
+        
+        .radio-option:hover {
+            border-color: var(--primary-color);
+            background-color: var(--light-gray);
+        }
+        
+        /* 选中即高亮（不支持 :has 的浏览器仍保留原生单选样式） */
+        .radio-option:has(input:checked) {
+            border-color: var(--primary-color);
+            background-color: var(--primary-soft);
+            color: var(--primary-dark);
+            font-weight: 600;
+        }
+        
+        .radio-option input[type="radio"] {
+            margin-right: 8px;
+            accent-color: var(--primary-color);
+        }
+        
+        .btn-generate {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            width: 100%;
+            margin-top: 8px;
+        }
+        
+        .btn-generate:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.28);
+        }
+        
+        .btn-generate:active {
+            transform: translateY(0);
+            box-shadow: none;
+        }
+        
+        /* 次级描边按钮 */
+        .btn-ghost {
+            width: 100%;
+            margin-top: 12px;
+            padding: 8px 12px;
+            background: white;
+            color: var(--secondary-color);
+            border: 1px solid var(--secondary-color);
+            border-radius: var(--radius);
+            font-size: 13px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .btn-ghost:hover {
+            background: var(--secondary-color);
+            color: white;
+        }
+        
+        .btn-ghost[hidden] {
+            display: none;
+        }
+        
+        .tab:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible {
+            outline: 2px solid var(--secondary-color);
+            outline-offset: 2px;
+        }
+        
+        .result-section {
+            background-color: #fafbf9;
+            border: 1px solid var(--medium-gray);
+            border-radius: var(--radius);
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            overflow: hidden;
+        }
+        
+        .result-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #555;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--medium-gray);
+            flex-shrink: 0;
+        }
+        
+        .result-title .tag {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--primary-dark);
+            background: var(--primary-soft);
+            border-radius: 20px;
+            padding: 2px 10px;
+            margin-left: 8px;
+        }
+        
+        .btn-copy-all {
+            background: white;
+            border: 1px solid var(--secondary-color);
+            color: var(--secondary-color);
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: var(--transition);
+            white-space: nowrap;
+        }
+        
+        .btn-copy-all:hover {
+            background: var(--secondary-color);
+            color: white;
+        }
+        
+        .result-content {
+            flex-grow: 1;
+            overflow-y: auto;
+            margin: -5px;
+            padding: 5px;
+        }
+        
+        .result-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 8px 10px;
+            background: white;
+            border: 1px solid transparent;
+            border-radius: var(--radius);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            flex-shrink: 0;
+            transition: var(--transition);
+        }
+        
+        .result-item:hover {
+            border-color: var(--primary-soft);
+            box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+            transform: translateX(2px);
+        }
+        
+        .result-item:hover .copy-btn {
+            opacity: 1;
+        }
+        
+        .result-label {
+            font-weight: 500;
+            min-width: 84px;
+            color: #666;
+            font-size: 13px;
+        }
+        
+        .result-value {
+            flex: 1;
+            word-break: break-all;
+            padding-right: 8px;
+            font-size: 14px;
+            min-width: 0;
+        }
+        
+        /* 克隆地址、路径等用等宽字体展示 */
+        .result-value.code {
+            font-family: var(--mono);
+            font-size: 13px;
+            color: #37474f;
+        }
+        
+        .result-value:empty::before {
+            content: '等待生成或解析…';
+            color: #c2c8c3;
+            font-size: 13px;
+        }
+        
+        .copy-btn {
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: var(--transition);
+            white-space: nowrap;
+            opacity: 0.72;
+        }
+        
+        .copy-btn:hover {
+            background-color: var(--secondary-dark);
+            opacity: 1;
+        }
+        
+        .copy-btn.copied {
+            background-color: #4CAF50;
+            opacity: 1;
+        }
+        
+        .hint {
+            margin-top: 6px;
+            font-size: 12px;
+            line-height: 1.7;
+            color: var(--muted);
+        }
+        
+        .hint code {
+            font-family: var(--mono);
+            font-size: 11.5px;
+            background: var(--light-gray);
+            padding: 1px 5px;
+            border-radius: 4px;
+            color: #5c6b66;
+            word-break: break-all;
+        }
+        
+        .msg {
+            display: none;
+            margin-top: 12px;
+            padding: 8px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            line-height: 1.6;
+            white-space: pre-line;
+            flex-shrink: 0;
+        }
+        
+        .msg.show {
+            display: block;
+            animation: rise 0.25s ease;
+        }
+        
+        .msg.error {
+            background: #fef0f0;
+            color: #c62828;
+            box-shadow: inset 3px 0 0 #e57373;
+        }
+        
+        .msg.ok {
+            background: #f1f8f2;
+            color: #2e7d32;
+            box-shadow: inset 3px 0 0 var(--primary-color);
+        }
+        
+        /* 解析成功但字段有疑义 */
+        .msg.warn {
+            background: #fff8e1;
+            color: #b26a00;
+            box-shadow: inset 3px 0 0 #ffb300;
+        }
+        
+        .btn-copy-all.copied {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+        
+        .footer-note {
+            margin-top: 14px;
+            text-align: center;
+            color: #888;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+        
+        @media (max-width: 920px) {
+            body {
+                align-items: flex-start;
+            }
+            
+            .app-container {
+                height: auto;
+            }
+            
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .result-section {
+                min-height: 320px;
+            }
+        }
+        
+        @media (max-width: 600px) {
+            .result-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .result-label {
+                margin-bottom: 5px;
+            }
+            
+            .copy-btn {
+                margin-top: 8px;
+            }
+        }
+        
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation: none !important;
+                transition: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="app-header">
+            <h1>项目信息生成器</h1>
+            <p class="app-subtitle">正向生成 · 备注反解析 · 一键复制</p>
+        </div>
+        
+        <div class="main-grid">
+            <div class="left-col">
+                <div class="tabs" role="tablist" aria-label="功能模式">
+                    <button class="tab active" id="tabGenerate" role="tab" aria-selected="true" aria-controls="panelGenerate" onclick="switchMode('generate')">由参数生成</button>
+                    <button class="tab" id="tabParse" role="tab" aria-selected="false" aria-controls="panelParse" onclick="switchMode('parse')">按备注反解析</button>
+                </div>
+                
+                <div class="panel active" id="panelGenerate" role="tabpanel" aria-labelledby="tabGenerate">
+                    <div class="form-group">
+                        <label>选择前缀：</label>
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="prefix" value="0" checked>
+                                <span>java (下标0)</span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="prefix" value="1">
+                                <span>web (下标1)</span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="prefix" value="2">
+                                <span>uni (下标2)</span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="prefix" value="3">
+                                <span>exe (下标3)</span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="prefix" value="4">
+                                <span>ccc (下标4)</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="projectName">项目名称（中文）：</label>
+                        <input type="text" id="projectName" placeholder="例如：设备计算器" value="设备计算器">
+                    </div>
+                    <div class="form-group">
+                        <label for="projectDate">项目日期（默认当天）：</label>
+                        <div class="date-field">
+                            <input type="date" id="projectDate" title="点击任意位置即可选择日期">
+                            <svg class="date-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <rect x="3" y="4" width="18" height="18" rx="2"></rect>
+                                <line x1="16" y1="2" x2="16" y2="6"></line>
+                                <line x1="8" y1="2" x2="8" y2="6"></line>
+                                <line x1="3" y1="10" x2="21" y2="10"></line>
+                            </svg>
+                        </div>
+                    </div>
+                    
+                    <button class="btn-generate" onclick="generateProjectInfo()">生成项目信息</button>
+                    <p class="hint">前缀、名称、日期变动会即时刷新结果；输入框内按 <code>Ctrl + Enter</code> 也可生成。</p>
+                </div>
+                
+                <div class="panel" id="panelParse" role="tabpanel" aria-labelledby="tabParse">
+                    <div class="form-group">
+                        <label for="remarkInput">项目备注：</label>
+                        <textarea id="remarkInput" rows="3" placeholder="例：260411_数采通用/1_shuCaiTongYong_java"></textarea>
+                        <p class="hint">格式为 <code>日期_中文名称/下标_拼音_前缀</code>，也支持直接粘贴整条克隆命令。</p>
+                    </div>
+                    
+                    <button class="btn-generate" onclick="parseProjectRemark()">解析项目信息</button>
+                    <p class="hint">解析成功后可用下方按钮回填到「由参数生成」，方便微调后重新生成。</p>
+                </div>
+                
+                <div class="msg" id="message" role="status" aria-live="polite"></div>
+                <button class="btn-ghost" id="backfillBtn" hidden onclick="backfillToForm()">回填到「由参数生成」</button>
+            </div>
+            
+            <div class="result-section" id="resultArea">
+                <div class="result-title">
+                    <span><span id="resultTitle">生成结果</span><span class="tag" id="resultTag">JAVA</span></span>
+                    <button class="btn-copy-all" onclick="copyAll(this)">复制全部</button>
+                </div>
+                <div class="result-content">
+                    <div class="result-item">
+                        <span class="result-label">项目名称：</span>
+                        <span class="result-value" id="projectFullName"></span>
+                        <button class="copy-btn" onclick="copyToClipboard('projectFullName', this)">复制</button>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">项目路径：</span>
+                        <span class="result-value code" id="projectPath"></span>
+                        <button class="copy-btn" onclick="copyToClipboard('projectPath', this)">复制</button>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">项目备注：</span>
+                        <span class="result-value code" id="projectRemark"></span>
+                        <button class="copy-btn" onclick="copyToClipboard('projectRemark', this)">复制</button>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">克隆地址：</span>
+                        <span class="result-value code" id="projectUrl"></span>
+                        <button class="copy-btn" onclick="copyToClipboard('projectUrl', this)">复制</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer-note">
+            提示：左侧选择“由参数生成”或“按备注反解析”，结果栏可直接单项复制或一键复制全部
+        </div>
+    </div>
+
+    <script>
+        var pinyin = pinyinPro.pinyin;
+        // 前缀数组
+        const prefixes = ['java', 'web', 'uni', 'exe', 'ccc'];
+        
+        // 获取今天的日期，格式为 YYYY-MM-DD（使用本地日期，避免 toISOString 的时区偏移）
+        function getTodayValue() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = (today.getMonth() + 1).toString().padStart(2, '0');
+            const day = today.getDate().toString().padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        
+        // 获取日期并格式化为两位年+两位月+两位日
+        // 如果用户提供了日期，则使用用户的日期，否则使用当前日期
+        function getFormattedDate(userDate = null) {
+            // 直接处理 YYYY-MM-DD 字符串，不经过 Date 解析，防止跨时区日期错位
+            if (typeof userDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(userDate)) {
+                return userDate.slice(2).replace(/-/g, '');
+            }
+            const date = userDate ? new Date(userDate) : new Date();
+            const year = date.getFullYear().toString().slice(-2);
+            const month = (date.getMonth() + 1).toString().padStart(2, '0');
+            const day = date.getDate().toString().padStart(2, '0');
+            return year + month + day;
+        }
+        
+        // 页面加载时设置日期输入框的默认值为今天
+        window.addEventListener('DOMContentLoaded', function() {
+            const dateInput = document.getElementById('projectDate');
+            dateInput.value = getTodayValue(); // 默认选中当天
+            
+            // 切换日期后自动刷新生成结果
+            dateInput.addEventListener('change', generateProjectInfo);
+            
+            // Firefox 等不支持日历指示器伪元素的浏览器，用 showPicker() 兼容“点击整框弹出”
+            const isFirefox = /Firefox|FxiOS/i.test(navigator.userAgent);
+            if (isFirefox && typeof dateInput.showPicker === 'function') {
+                dateInput.addEventListener('click', function() {
+                    try {
+                        dateInput.showPicker();
+                    } catch (e) {
+                        // 缺少用户手势等场景下忽略
+                    }
+                });
+            }
+            
+            // 生成模式下，前缀/名称/日期变动即时刷新结果
+            document.querySelectorAll('input[name="prefix"]').forEach(function(el) {
+                el.addEventListener('change', generateProjectInfo);
+            });
+            document.getElementById('projectName').addEventListener('input', generateProjectInfo);
+            
+            // 输入备注时清除上一次提示
+            document.getElementById('remarkInput').addEventListener('input', clearMsg);
+            
+            // Ctrl / Cmd + Enter：按当前模式执行生成或解析
+            document.addEventListener('keydown', function(e) {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                    e.preventDefault();
+                    currentMode === 'parse' ? parseProjectRemark() : generateProjectInfo();
+                }
+            });
+        });
+
+        // 使用第三方库将中文转换为小驼峰拼音
+        function chineseToCamelCasePinyin(chinese) {
+            if (!chinese) return '';
+            
+            // 直接使用拼音库的多种可能API格式
+            try {
+                let pinyinResult;
+                
+                // 尝试最常见的pinyin库API格式
+                if (typeof pinyin === 'function') {
+                    // 尝试格式1: pinyin(text, options)
+                    try {
+                         pinyinResult = pinyin(chinese, { toneType: "none", type: "array" })
+						.join("-")
+						.replace(/-\w/g, function (v) {
+							return v.substring(1).toUpperCase();
+						});
+                    } catch (e1) {
+                       console.warn('无法使用pinyin库的标准API，尝试备选方法');
+                    }
+                }
+                return pinyinResult;
+            } catch (error) {
+                console.error('拼音转换过程中出现错误:', error);
+            }
+            
+            // 兜底方案：如果拼音库完全无法使用，生成一个基于项目名称的唯一标识
+            // 移除所有非中文字符，然后取每个汉字的首字母作为拼音缩写
+            const chineseChars = chinese.replace(/[^\u4e00-\u9fa5]/g, '');
+            if (chineseChars.length > 0) {
+                // 返回基于中文的简单标识符，避免使用固定值
+                return 'project' + chineseChars.length;
+            }
+            
+            // 最终兜底
+            return 'project';
+        }
+
+        // 当前模式与最近一次结果（供复制全部、回填使用）
+        let currentMode = 'generate';
+        let lastInfo = null;
+        let lastParsed = null;
+        
+        // 备注：日期_中文名称/下标_拼音_前缀；也允许从整条克隆命令中抓取
+        const PREFIX_ALT = prefixes.join('|');
+        const FULL_REMARK_RE = new RegExp('(\\d{6})_([^/\\s"\']+?)/\\s*(\\d+)_([A-Za-z][A-Za-z0-9]*)_(' + PREFIX_ALT + ')');
+        // 仅项目路径：下标_拼音_前缀（前后不能紧邻其他字母数字）
+        const PATH_ONLY_RE = new RegExp('(?:^|[^A-Za-z0-9])(\\d+)_([A-Za-z][A-Za-z0-9]*)_(' + PREFIX_ALT + ')(?:$|[^A-Za-z0-9])');
+        
+        // 由六个字段组装完整项目信息（生成与解析共用）
+        function assembleInfo(dateStr, nameCN, prefixIndex, projectPinyin, pathIndex) {
+            const prefix = prefixes[prefixIndex];
+            const idx = pathIndex || (prefixIndex + 1);
+            const projectPath = `${idx}_${projectPinyin}_${prefix}`;
+            const remark = `${dateStr}_${nameCN}/${projectPath}`;
+            return {
+                dateStr: dateStr,
+                nameCN: nameCN,
+                pinyin: projectPinyin,
+                prefix: prefix,
+                prefixIndex: prefixIndex,
+                pathIndex: idx,
+                isoDate: remarkDateToISO(dateStr),
+                fullName: `KM_${dateStr}_${prefix.toUpperCase()}_${nameCN}`,
+                projectPath: projectPath,
+                remark: remark,
+                cloneUrl: `git clone https://gitcode.com/wangzhao666/${projectPath}.git "e:/KM_GITCODE/${remark}"`
+            };
+        }
+        
+        // 将备注中的 260411 转为 ISO 日期（世纪按 20xx 推断），非法日期返回 null
+        function remarkDateToISO(dateStr) {
+            if (!/^\d{6}$/.test(String(dateStr))) return null;
+            const yy = parseInt(dateStr.slice(0, 2), 10);
+            const mm = parseInt(dateStr.slice(2, 4), 10);
+            const dd = parseInt(dateStr.slice(4, 6), 10);
+            const year = 2000 + yy;
+            const date = new Date(year, mm - 1, dd);
+            // 回读校验，排除 0230 这类进位后的非法日期
+            if (date.getMonth() !== mm - 1 || date.getDate() !== dd) return null;
+            return `${year}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+        }
+        
+        // 渲染四项结果
+        function renderResult(info, titleText) {
+            lastInfo = info;
+            document.getElementById('projectFullName').textContent = info.fullName;
+            document.getElementById('projectPath').textContent = info.projectPath;
+            document.getElementById('projectRemark').textContent = info.remark;
+            document.getElementById('projectUrl').textContent = info.cloneUrl;
+            document.getElementById('resultTitle').textContent = titleText;
+            document.getElementById('resultTag').textContent = info.prefix.toUpperCase();
+            document.getElementById('resultArea').classList.add('show');
+        }
+        
+        // 页面内提示（代替 alert）
+        function showMsg(text, type = 'ok') {
+            const el = document.getElementById('message');
+            el.textContent = text;
+            el.className = 'msg show ' + type;
+        }
+        
+        function clearMsg() {
+            const el = document.getElementById('message');
+            el.className = 'msg';
+            el.textContent = '';
+        }
+        
+        // 切换生成/解析面板
+        function switchMode(mode) {
+            currentMode = mode === 'parse' ? 'parse' : 'generate';
+            const isParse = currentMode === 'parse';
+            
+            document.getElementById('tabGenerate').classList.toggle('active', !isParse);
+            document.getElementById('tabParse').classList.toggle('active', isParse);
+            document.getElementById('tabGenerate').setAttribute('aria-selected', String(!isParse));
+            document.getElementById('tabParse').setAttribute('aria-selected', String(isParse));
+            document.getElementById('panelGenerate').classList.toggle('active', !isParse);
+            document.getElementById('panelParse').classList.toggle('active', isParse);
+            document.getElementById('backfillBtn').hidden = !(isParse && lastParsed);
+            
+            clearMsg();
+            document.getElementById(isParse ? 'remarkInput' : 'projectName').focus();
+        }
+        
+        // 生成项目信息
+        function generateProjectInfo() {
+            const prefixElements = document.getElementsByName('prefix');
+            let prefixIndex = 0; // 默认值
+            for (const element of prefixElements) {
+                if (element.checked) {
+                    prefixIndex = parseInt(element.value);
+                    break;
+                }
+            }
+            const projectNameCN = document.getElementById('projectName').value.trim();
+            const projectDate = document.getElementById('projectDate').value;
+            
+            if (!projectNameCN) {
+                showMsg('请输入项目名称', 'error');
+                return;
+            }
+            
+            const dateStr = getFormattedDate(projectDate);
+            // 生成小驼峰格式的拼音（使用第三方库）
+            const projectPinyin = chineseToCamelCasePinyin(projectNameCN);
+            
+            renderResult(assembleInfo(dateStr, projectNameCN, prefixIndex, projectPinyin, prefixIndex + 1), '生成结果');
+            clearMsg();
+        }
+        
+        // 反向解析项目备注
+        function parseProjectRemark() {
+            const raw = document.getElementById('remarkInput').value.trim();
+            if (!raw) {
+                showMsg('请先粘贴项目备注，例：260411_数采通用/1_shuCaiTongYong_java', 'error');
+                return;
+            }
+            
+            // 容忍全角斜杠
+            const text = raw.replace(/\uff0f/g, '/');
+            const matched = text.match(FULL_REMARK_RE);
+            
+            if (!matched) {
+                const pathMatch = text.match(PATH_ONLY_RE);
+                if (pathMatch) {
+                    showMsg(`只识别到项目路径「${pathMatch[1]}_${pathMatch[2]}_${pathMatch[3]}」，缺少「日期_中文名称」部分，请粘贴完整备注`, 'error');
+                } else {
+                    showMsg('未能识别，备注格式应为 日期_中文名称/下标_拼音_前缀，例：260411_数采通用/1_shuCaiTongYong_java', 'error');
+                }
+                return;
+            }
+            
+            const dateStr = matched[1];
+            const nameCN = matched[2].trim();
+            const pathIndex = parseInt(matched[3], 10);
+            const projectPinyin = matched[4];
+            const prefixIndex = prefixes.indexOf(matched[5]);
+            
+            const info = assembleInfo(dateStr, nameCN, prefixIndex, projectPinyin, pathIndex);
+            const warnings = [];
+            
+            if (!info.isoDate) {
+                warnings.push(`日期段 ${dateStr} 不是有效日期`);
+            }
+            if (pathIndex !== prefixIndex + 1) {
+                warnings.push(`下标 ${pathIndex} 与前缀 ${info.prefix}（应为 ${prefixIndex + 1}）不一致`);
+            }
+            const derivedPinyin = chineseToCamelCasePinyin(nameCN);
+            if (derivedPinyin && derivedPinyin !== projectPinyin) {
+                warnings.push(`中文名推导拼音为 ${derivedPinyin}，与备注中的 ${projectPinyin} 不同（已沿用备注值）`);
+            }
+            
+            lastParsed = info;
+            renderResult(info, '解析结果');
+            document.getElementById('backfillBtn').hidden = currentMode !== 'parse';
+            
+            showMsg(
+                warnings.length
+                    ? `已解析：${info.remark}\n${warnings.join('；')}`
+                    : `已解析：日期 ${dateStr}、名称 ${nameCN}、前缀 ${info.prefix}（下标 ${pathIndex}）`,
+                warnings.length ? 'warn' : 'ok'
+            );
+        }
+        
+        // 将解析结果回填到生成表单
+        function backfillToForm() {
+            if (!lastParsed) return;
+            const p = lastParsed;
+            const radio = document.querySelector(`input[name="prefix"][value="${p.prefixIndex}"]`);
+            if (radio) radio.checked = true;
+            document.getElementById('projectName').value = p.nameCN;
+            if (p.isoDate) document.getElementById('projectDate').value = p.isoDate;
+            
+            switchMode('generate');
+            generateProjectInfo();
+            showMsg(`已回填：${p.nameCN} / ${p.prefix}${p.isoDate ? ' / ' + p.isoDate : '（日期无效，沿用当前）'}`, 'ok');
+        }
+        
+        // 一键复制四项结果
+        function copyAll(button) {
+            if (!lastInfo) {
+                showMsg('请先生成或解析项目信息', 'error');
+                return;
+            }
+            const text = [
+                `项目名称：${lastInfo.fullName}`,
+                `项目路径：${lastInfo.projectPath}`,
+                `项目备注：${lastInfo.remark}`,
+                `克隆地址：${lastInfo.cloneUrl}`
+            ].join('\n');
+            writeClipboard(text, () => flashButton(button, '已复制全部'), () => showMsg('复制失败，请手动选择复制', 'error'));
+        }
+        
+        // 剪贴板写入（本地 file:// 打开时 navigator.clipboard 可能不可用，降级 execCommand）
+        function writeClipboard(text, onOk, onFail) {
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(onOk).catch(() => legacyCopy(text, onOk, onFail));
+            } else {
+                legacyCopy(text, onOk, onFail);
+            }
+        }
+        
+        function legacyCopy(text, onOk, onFail) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.top = '-9999px';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            let ok = false;
+            try {
+                ok = document.execCommand('copy');
+            } catch (e) {
+                ok = false;
+            }
+            document.body.removeChild(ta);
+            ok ? onOk() : onFail();
+        }
+        
+        // 按钮临时反馈文案
+        function flashButton(button, label) {
+            if (button.dataset.original === undefined) button.dataset.original = button.textContent;
+            button.textContent = label;
+            button.classList.add('copied');
+            setTimeout(() => {
+                button.textContent = button.dataset.original;
+                button.classList.remove('copied');
+            }, 2000);
+        }
+
+        // 复制到剪贴板功能（优化版）
+        function copyToClipboard(elementId, button) {
+            const element = document.getElementById(elementId);
+            const text = element.textContent;
+            if (!text) {
+                showMsg('没有可复制的内容', 'error');
+                return;
+            }
+            writeClipboard(
+                text,
+                () => flashButton(button, '已复制'),
+                () => {
+                    console.error('复制失败');
+                    showMsg('复制失败，请手动选择复制', 'error');
+                }
+            );
+        }
+
+        // 页面加载时自动生成示例
+        window.onload = function() {
+            // 确保页面完全加载后再生成内容
+            setTimeout(generateProjectInfo, 100);
+        };
+    </script>
+</body>
+</html>
